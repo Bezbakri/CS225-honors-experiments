@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <cstring>
+#include <chrono>
 
 // #define RANDTOP INT_MAX
 #define RANDTOP 10
@@ -36,7 +37,7 @@ void printVector(double *a, int n)
 }
 
 
-// Parallel
+// Parallel 
 void matmul(double *A, double *B, double *C, int n)
 {
 	#pragma omp parallel for
@@ -45,10 +46,15 @@ void matmul(double *A, double *B, double *C, int n)
 			C[loc(i,j,n)] = 0.0;
 	
 	#pragma omp parallel for
-	for(int i = 0; i < n; i++)
-		for(int j = 0; j < n; j++)
-			for(int k = 0; k < n; k++)
-				C[loc(i,j,n)]+= A[loc(i,k,n)] * B[loc(k,j,n)];
+	for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				int sum = 0;
+				for (int k = 0; k < n; k++) {
+					sum += A[loc(i,k,n)] * B[loc(k,j,n)];
+				}
+				C[loc(i,j,n)] = sum;
+			}
+		}
 				
 }
 
@@ -68,7 +74,7 @@ void mulMat(double* mat1, double* mat2, double* mat3, int n)
     } 
 } 
 
-// Normal
+// Normal (from lecture code)
 void prefix(double *a, double *b, int n)
 {
 		for(int i = 0; i < n; i++)
@@ -118,7 +124,7 @@ int main(int argc, char *argv[]) {
 	std::cout << "Running with OMP max threads = " << omp_get_max_threads() << std::endl;
 
 	if(argc == 1){
-		n = 4;
+		n = 1600;
 	
 		A =(double *) malloc(sizeof(double)*n*n);
 		B =(double *) malloc(sizeof(double)*n*n);
@@ -132,18 +138,28 @@ int main(int argc, char *argv[]) {
 				C[loc(i,j,n)] = 9;
 			}
 
-		printf("A = \n");
-		printMatrix(A, n);
-		printf("B = \n");
-		printMatrix(B, n);
-		printf("C = \n");
-		printMatrix(C, n);
-		printf("A * B = \n");
-		matmul(A, B, C, n);
-		printMatrix(C, n);
+		// printf("A = \n");
+		// printMatrix(A, n);
+		// printf("B = \n");
+		// printMatrix(B, n);
+		// printf("C = \n");
+		// printMatrix(C, n);
+		// printf("A * B = \n");
+		auto start_parallel = std::chrono::high_resolution_clock::now();
+		matmul(A, B, C, n); // parallel
+		auto end_parallel = std::chrono::high_resolution_clock::now();
+		auto duration_parallel = std::chrono::duration<double>(end_parallel - start_parallel);
+		std::cout << "Time taken for parallel " << duration_parallel.count() << std::endl;
+		// printMatrix(C, n);
+		auto start_serial = std::chrono::high_resolution_clock::now();
+		mulMat(A, B, C, n); // normal
+		auto end_serial = std::chrono::high_resolution_clock::now();
+		auto duration_serial = std::chrono::duration<double>(end_serial - start_serial);	
+		std::cout << "Time taken for normal " << duration_serial.count() << std::endl;	
+		// printMatrix(C, n);
 
 	} else if(argc == 2) {
-		n = 10;
+		n = 20000;
 		int testnumber = atoi(argv[1]);
 		A = (double*) malloc(sizeof(double)*n*n);
 		B = (double*) malloc(sizeof(double)*n*n);
@@ -170,9 +186,18 @@ int main(int argc, char *argv[]) {
 		}
 
 		// test here
-		prefixParallel(a, b, n);
-		printVector(a, n);
-		printVector(b, n);
+		auto start_parallel = std::chrono::high_resolution_clock::now();
+		prefixParallel(a, b, n); // parallel
+		auto end_parallel = std::chrono::high_resolution_clock::now();
+		auto duration_parallel = std::chrono::duration<double>(end_parallel - start_parallel);
+		std::cout << "Time taken for parallel " << duration_parallel.count() << std::endl;
+		auto start_serial = std::chrono::high_resolution_clock::now();
+		prefix(a, b, n); // normal
+		auto end_serial = std::chrono::high_resolution_clock::now();
+		auto duration_serial = std::chrono::duration<double>(end_serial - start_serial);	
+		std::cout << "Time taken for normal " << duration_serial.count() << std::endl;	
+		// printVector(a, n);
+		// printVector(b, n);
 
 	} else {
 		std::cout << "This only takes the n dimension as an argument" << std::endl;
